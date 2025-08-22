@@ -1,16 +1,10 @@
 const badWords = [
-  // Offensive words list
-  'abuse', 'hate', 'racist', 'sexist', 'spam',
-  // Common profanity
-  'fuck', 'fucking', 'fucker', 'fucked', 'fucks', 'shit', 'shitty', 
-  'ass', 'asshole', 'bastard', 'bitch', 'damn', 'hell', 'piss',
-  'dick', 'cock', 'pussy', 'cunt', 'whore', 'slut',
-  // Variations and combinations
-  'f*ck', 'fck', 'fuk', 'sh*t', 'sh1t', 'a$$', '@ss',
-  'b*tch', 'b1tch', 'd*mn', 'h*ll',
-  // Slurs and hate speech
-  'nigger', 'nigga', 'faggot', 'fag', 'retard', 'retarded',
-  'gay' // when used as an insult
+  // Only block severe offensive words and slurs
+  'nigger', 'nigga', 'faggot', 'fag',
+  // Extreme profanity only
+  'fuck', 'fucking', 'cunt',
+  // Clear hate speech
+  'terrorist', 'jihad', 'nazi'
 ];
 
 // Hindi/Indian language inappropriate words
@@ -45,36 +39,36 @@ class ContentModerationService {
       }
     }
 
-    // Check for spam patterns
+    // Check for spam patterns (reduced sensitivity)
     const spamPatterns = [
-      /(\b\w+\b)\s+\1{3,}/gi, // Repeated words
-      /(http|https):\/\/[^\s]+/gi, // URLs (limit them)
-      /\b[A-Z]{5,}\b/g, // All caps words
-      /[!?]{3,}/g, // Excessive punctuation
+      /(\b\w+\b)\s+\1{5,}/gi, // Repeated words (increased threshold from 3 to 5)
+      /(http|https):\/\/[^\s]+/gi, // URLs (allow more)
+      /\b[A-Z]{10,}\b/g, // All caps words (increased threshold from 5 to 10)
+      /[!?]{5,}/g, // Excessive punctuation (increased threshold from 3 to 5)
     ];
 
     let spamScore = 0;
     
     // Check for repeated words
-    if (spamPatterns[0].test(text)) spamScore += 2;
+    if (spamPatterns[0].test(text)) spamScore += 1;
     
-    // Check for too many URLs
+    // Check for too many URLs (increased threshold from 3 to 5)
     const urlMatches = text.match(spamPatterns[1]);
-    if (urlMatches && urlMatches.length > 3) spamScore += 2;
+    if (urlMatches && urlMatches.length > 5) spamScore += 1;
     
-    // Check for excessive caps
+    // Check for excessive caps (increased threshold from 5 to 10)
     const capsMatches = text.match(spamPatterns[2]);
-    if (capsMatches && capsMatches.length > 5) spamScore += 1;
+    if (capsMatches && capsMatches.length > 10) spamScore += 1;
     
     // Check for excessive punctuation
     if (spamPatterns[3].test(text)) spamScore += 1;
 
-    // Determine severity
-    if (flaggedWords.length > 0 || spamScore > 3) {
+    // Determine severity (more lenient thresholds)
+    if (flaggedWords.length > 2 || spamScore > 5) {
       severity = 'high';
-    } else if (spamScore > 1) {
+    } else if (flaggedWords.length > 0 || spamScore > 3) {
       severity = 'medium';
-    } else if (spamScore > 0) {
+    } else if (spamScore > 1) {
       severity = 'low';
     }
 
@@ -115,13 +109,13 @@ class ContentModerationService {
   static shouldRateLimit(recentPosts) {
     if (!recentPosts || recentPosts.length === 0) return false;
 
-    // Check if posting too frequently (more than 5 posts in 10 minutes)
+    // Check if posting too frequently (increased from 5 to 10 posts in 10 minutes)
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
     const recentCount = recentPosts.filter(post => 
       new Date(post.createdAt) > tenMinutesAgo
     ).length;
 
-    return recentCount >= 5;
+    return recentCount >= 10;
   }
 
   /**
@@ -147,8 +141,8 @@ class ContentModerationService {
       errors.push('Title must be less than 200 characters');
     }
 
-    // Check if title is all caps
-    if (titleStr && titleStr === titleStr.toUpperCase() && titleStr.length > 10) {
+    // Check if title is all caps (more lenient - only flag if > 30 chars)
+    if (titleStr && titleStr === titleStr.toUpperCase() && titleStr.length > 30) {
       errors.push('Please avoid using all caps in title');
     }
 
@@ -221,7 +215,8 @@ const moderateContentMiddleware = (req, res, next) => {
     }
 
     const titleModeration = ContentModerationService.moderateContent(titleStr);
-    if (titleModeration.severity === 'high') {
+    // Only block if severity is high AND there are flagged words
+    if (titleModeration.severity === 'high' && titleModeration.flaggedWords.length > 0) {
       return res.status(400).json({ 
         error: 'Title contains inappropriate content',
         message: 'Please revise your title and try again'
@@ -244,15 +239,16 @@ const moderateContentMiddleware = (req, res, next) => {
     }
 
     const contentModeration = ContentModerationService.moderateContent(contentStr);
-    if (contentModeration.severity === 'high') {
+    // Only block if severity is high AND there are multiple flagged words
+    if (contentModeration.severity === 'high' && contentModeration.flaggedWords.length > 1) {
       return res.status(400).json({ 
         error: 'Content contains inappropriate language or spam',
         message: 'Please revise your content and try again'
       });
     }
 
-    // Clean the content but preserve it for review if needed
-    if (contentModeration.requiresReview) {
+    // Only flag for review if there are actual bad words
+    if (contentModeration.flaggedWords.length > 0) {
       req.body.flaggedForReview = true;
       req.body.moderationReport = contentModeration;
     }

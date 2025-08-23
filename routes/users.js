@@ -105,15 +105,23 @@ router.get('/:userId/events', authMiddleware, async (req, res) => {
 });
 
 // Update user profile
-router.patch('/:userId', authMiddleware, async (req, res) => {
+router.patch('/:userId/profile', authMiddleware, async (req, res) => {
   try {
     // Check if user is updating their own profile
-    if (req.user.userId !== req.params.userId) {
+    if (req.user.userId !== req.params.userId && req.user.id !== req.params.userId && req.user._id?.toString() !== req.params.userId) {
       return res.status(403).json({ error: 'Unauthorized to update this profile' });
     }
     
-    const allowedUpdates = ['fullName', 'bio', 'location', 'occupation', 'interests'];
+    const allowedUpdates = ['fullName', 'username', 'bio', 'location', 'occupation', 'interests'];
     const updates = {};
+    
+    // Check if username is being updated and if it's unique
+    if (req.body.username && req.body.username !== req.user.username) {
+      const existingUser = await User.findOne({ username: req.body.username });
+      if (existingUser) {
+        return res.status(400).json({ error: 'Username already taken' });
+      }
+    }
     
     allowedUpdates.forEach(field => {
       if (req.body[field] !== undefined) {
@@ -134,8 +142,15 @@ router.patch('/:userId', authMiddleware, async (req, res) => {
     res.json(user);
   } catch (error) {
     console.error('Error updating user profile:', error);
-    res.status(500).json({ error: 'Failed to update profile' });
+    res.status(500).json({ error: error.message || 'Failed to update profile' });
   }
+});
+
+// Legacy endpoint for backwards compatibility
+router.patch('/:userId', authMiddleware, async (req, res) => {
+  // Redirect to the new endpoint
+  req.url = `${req.url}/profile`;
+  router.handle(req, res);
 });
 
 module.exports = router;

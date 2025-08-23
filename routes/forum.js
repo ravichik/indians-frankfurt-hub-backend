@@ -247,4 +247,32 @@ router.patch('/posts/:id/lock', [authMiddleware, moderatorMiddleware], async (re
   }
 });
 
+// Pin/Unpin post (admin only)
+router.patch('/posts/:id/pin', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can pin/unpin posts' });
+    }
+
+    const post = await ForumPost.findByIdAndUpdate(
+      req.params.id,
+      { isPinned: req.body.isPinned },
+      { new: true }
+    ).populate('author', 'username fullName avatar');
+
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    res.json({ 
+      message: `Post ${req.body.isPinned ? 'pinned' : 'unpinned'} successfully`, 
+      post 
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

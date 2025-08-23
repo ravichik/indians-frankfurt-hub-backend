@@ -174,7 +174,7 @@ router.post('/forgot-password', [
     await user.save();
 
     // Create reset URL
-    const resetUrl = `http://localhost:3000/reset-password/${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
     
     // Send email (for now, just log it)
     await sendPasswordResetEmail(user.email, resetUrl);

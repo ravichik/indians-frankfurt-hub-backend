@@ -4,8 +4,7 @@ const blogPostSchema = new mongoose.Schema({
   title: {
     type: String,
     required: true,
-    trim: true,
-    maxlength: 200
+    trim: true
   },
   slug: {
     type: String,
@@ -15,8 +14,7 @@ const blogPostSchema = new mongoose.Schema({
   },
   excerpt: {
     type: String,
-    required: true,
-    maxlength: 300
+    required: true
   },
   content: {
     type: String,
@@ -59,12 +57,10 @@ const blogPostSchema = new mongoose.Schema({
     default: 0 // in minutes
   },
   seoTitle: {
-    type: String,
-    maxlength: 60
+    type: String
   },
   seoDescription: {
-    type: String,
-    maxlength: 160
+    type: String
   },
   seoKeywords: [{
     type: String

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const BlogPost = require('../models/BlogPost');
-const auth = require('../middleware/auth');
+const { authMiddleware: auth } = require('../middleware/auth');
 
 // Get all published blog posts (public)
 router.get('/posts', async (req, res) => {
@@ -222,6 +222,28 @@ router.post('/posts/:id/comments', auth, async (req, res) => {
   } catch (error) {
     console.error('Error adding comment:', error);
     res.status(500).json({ message: 'Error adding comment' });
+  }
+});
+
+// Get single post for admin editing (including drafts)
+router.get('/admin/posts/:id', auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const post = await BlogPost.findById(req.params.id)
+      .populate('author', 'name avatar');
+
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    res.json(post);
+  } catch (error) {
+    console.error('Error fetching post for edit:', error);
+    res.status(500).json({ message: 'Error fetching post' });
   }
 });
 

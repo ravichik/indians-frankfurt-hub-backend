@@ -101,13 +101,17 @@ const blogPostSchema = new mongoose.Schema({
 
 // Generate slug from title before saving
 blogPostSchema.pre('save', function(next) {
-  if (this.isModified('title') && !this.slug) {
+  // Only generate slug if not provided
+  if (!this.slug && this.title) {
     this.slug = this.title
       .toLowerCase()
       .replace(/[^\w\s-]/g, '') // Remove special characters
       .replace(/\s+/g, '-') // Replace spaces with hyphens
       .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
       .trim();
+    
+    // Add timestamp to ensure uniqueness
+    this.slug = `${this.slug}-${Date.now()}`;
   }
   
   // Calculate reading time (average 200 words per minute)

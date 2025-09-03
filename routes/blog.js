@@ -109,8 +109,23 @@ router.post('/posts', auth, async (req, res) => {
       return res.status(403).json({ message: 'Only admins can create blog posts' });
     }
 
+    // Generate slug if not provided
+    let slug = req.body.slug;
+    if (!slug && req.body.title) {
+      slug = req.body.title
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim();
+      
+      // Add timestamp to ensure uniqueness
+      slug = `${slug}-${Date.now()}`;
+    }
+
     const blogPost = new BlogPost({
       ...req.body,
+      slug,
       author: req.user.userId
     });
 
@@ -120,7 +135,7 @@ router.post('/posts', auth, async (req, res) => {
     res.status(201).json(blogPost);
   } catch (error) {
     console.error('Error creating blog post:', error);
-    res.status(500).json({ message: 'Error creating blog post' });
+    res.status(500).json({ message: 'Error creating blog post', error: error.message });
   }
 });
 
@@ -130,6 +145,22 @@ router.put('/posts/:id', auth, async (req, res) => {
     // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Only admins can update blog posts' });
+    }
+
+    // If updating title and no slug provided, generate new slug
+    if (req.body.title && !req.body.slug) {
+      const existingPost = await BlogPost.findById(req.params.id);
+      if (existingPost && existingPost.title !== req.body.title) {
+        req.body.slug = req.body.title
+          .toLowerCase()
+          .replace(/[^\w\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .trim();
+        
+        // Add timestamp to ensure uniqueness if slug changed
+        req.body.slug = `${req.body.slug}-${Date.now()}`;
+      }
     }
 
     const post = await BlogPost.findByIdAndUpdate(
@@ -145,7 +176,7 @@ router.put('/posts/:id', auth, async (req, res) => {
     res.json(post);
   } catch (error) {
     console.error('Error updating blog post:', error);
-    res.status(500).json({ message: 'Error updating blog post' });
+    res.status(500).json({ message: 'Error updating blog post', error: error.message });
   }
 });
 

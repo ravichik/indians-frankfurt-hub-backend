@@ -19,7 +19,7 @@ router.get('/stats', async (req, res) => {
 
     // Get user statistics
     const totalUsers = await User.countDocuments();
-    const newUsersToday = await User.countDocuments({ createdAt: { $gte: today } });
+    const newUsersToday = await User.countDocuments({ joinedDate: { $gte: today } });
     const activeUsers = await User.countDocuments({ lastActive: { $gte: subDays(new Date(), 7) } });
 
     // Get post statistics

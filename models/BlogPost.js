@@ -10,7 +10,8 @@ const blogPostSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    lowercase: true
+    lowercase: true,
+    index: true
   },
   excerpt: {
     type: String,
@@ -129,7 +130,6 @@ blogPostSchema.pre('save', function(next) {
 });
 
 // Add index for better query performance
-blogPostSchema.index({ slug: 1 });
 blogPostSchema.index({ status: 1, publishedAt: -1 });
 blogPostSchema.index({ category: 1 });
 blogPostSchema.index({ tags: 1 });

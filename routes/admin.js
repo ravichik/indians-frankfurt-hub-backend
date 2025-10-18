@@ -60,51 +60,137 @@ router.get('/stats', async (req, res) => {
 // Get analytics data
 router.get('/analytics', async (req, res) => {
   try {
-    // Generate sample analytics data
     const userGrowth = [];
     const postActivity = [];
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    
+
     // User growth data (last 7 days)
     for (let i = 6; i >= 0; i--) {
       const date = subDays(new Date(), i);
+      const nextDate = subDays(new Date(), i - 1);
+
       const count = await User.countDocuments({
-        createdAt: {
+        joinedDate: {
           $gte: startOfDay(date),
-          $lt: startOfDay(subDays(date, -1))
+          $lt: startOfDay(nextDate)
         }
       });
+
       userGrowth.push({
         date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         users: count
       });
     }
 
-    // Post activity (last 7 days)
-    for (let i = 0; i < 7; i++) {
-      const posts = Math.floor(Math.random() * 50) + 10;
-      const replies = Math.floor(Math.random() * 100) + 20;
+    // Post activity (last 7 days) - Real data
+    for (let i = 6; i >= 0; i--) {
+      const date = subDays(new Date(), i);
+      const nextDate = subDays(new Date(), i - 1);
+
+      const posts = await ForumPost.countDocuments({
+        createdAt: {
+          $gte: startOfDay(date),
+          $lt: startOfDay(nextDate)
+        }
+      });
+
+      // Count replies
+      const postsWithReplies = await ForumPost.find({
+        'replies.createdAt': {
+          $gte: startOfDay(date),
+          $lt: startOfDay(nextDate)
+        }
+      });
+
+      let replies = 0;
+      postsWithReplies.forEach(post => {
+        if (post.replies) {
+          replies += post.replies.filter(reply => {
+            const replyDate = new Date(reply.createdAt);
+            return replyDate >= startOfDay(date) && replyDate < startOfDay(nextDate);
+          }).length;
+        }
+      });
+
       postActivity.push({
-        day: days[i],
+        day: days[6 - i],
         posts,
         replies
       });
     }
 
-    // Top categories
-    const topCategories = [
-      { name: 'General', value: 35 },
-      { name: 'Housing', value: 25 },
-      { name: 'Jobs', value: 20 },
-      { name: 'Events', value: 15 },
-      { name: 'Others', value: 5 }
-    ];
+    // Top categories - Real data from actual posts
+    const categoryStats = await ForumPost.aggregate([
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      }
+    ]);
+
+    const topCategories = categoryStats.map(stat => ({
+      name: stat._id.charAt(0).toUpperCase() + stat._id.slice(1).replace(/-/g, ' '),
+      value: stat.count
+    }));
+
+    // User engagement metrics
+    const totalPosts = await ForumPost.countDocuments();
+    const totalUsers = await User.countDocuments();
+    const averagePostsPerUser = totalUsers > 0 ? (totalPosts / totalUsers).toFixed(1) : 0;
+
+    // Get most active users
+    const mostActiveUsers = await ForumPost.aggregate([
+      {
+        $group: {
+          _id: '$author',
+          postCount: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $unwind: '$user'
+      },
+      {
+        $project: {
+          username: '$user.username',
+          postCount: 1
+        }
+      },
+      {
+        $sort: { postCount: -1 }
+      },
+      {
+        $limit: 5
+      }
+    ]);
+
+    const userEngagement = mostActiveUsers.map(user => ({
+      username: user.username,
+      posts: user.postCount,
+      engagement: Math.min(100, (user.postCount / Math.max(1, totalPosts / totalUsers)) * 20)
+    }));
 
     res.json({
       userGrowth,
       postActivity,
       topCategories,
-      userEngagement: []
+      userEngagement,
+      summary: {
+        averagePostsPerUser: parseFloat(averagePostsPerUser),
+        totalCategories: categoryStats.length,
+        mostActiveCategory: topCategories[0]?.name || 'None'
+      }
     });
   } catch (error) {
     console.error('Error fetching analytics:', error);

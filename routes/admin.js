@@ -136,7 +136,7 @@ router.get('/users', async (req, res) => {
 
     const users = await User.find(query)
       .select('-password')
-      .sort({ createdAt: -1 })
+      .sort({ joinedDate: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
 

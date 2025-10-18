@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const Event = require('../models/Event');
+const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
+const { sendNewEventNotification } = require('../services/emailService');
 
 router.get('/', async (req, res) => {
   try {
@@ -87,6 +89,11 @@ router.post('/', authMiddleware, [
     const event = new Event(eventData);
     await event.save();
     await event.populate('organizer', 'username fullName');
+
+    // Send notification email to admin
+    sendNewEventNotification(event, event.organizer).catch(err => {
+      console.error('Failed to send new event notification:', err);
+    });
 
     res.status(201).json({
       message: 'Event created successfully',

@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
-const { sendPasswordResetEmail } = require('../services/emailService');
+const { sendPasswordResetEmail, sendNewUserNotification } = require('../services/emailService');
 const { verifyGoogleToken } = require('../config/googleAuth');
 
 router.post('/register', [
@@ -40,6 +40,11 @@ router.post('/register', [
     });
 
     await user.save();
+
+    // Send notification email to admin
+    sendNewUserNotification(user).catch(err => {
+      console.error('Failed to send new user notification:', err);
+    });
 
     const token = jwt.sign(
       { 
@@ -236,6 +241,11 @@ router.post('/google', async (req, res) => {
       });
 
       await user.save();
+
+      // Send notification email to admin for new Google user
+      sendNewUserNotification(user).catch(err => {
+        console.error('Failed to send new Google user notification:', err);
+      });
     }
 
     // Generate JWT token

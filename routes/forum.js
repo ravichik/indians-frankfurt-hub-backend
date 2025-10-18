@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const ForumPost = require('../models/ForumPost');
+const User = require('../models/User');
 const { authMiddleware, moderatorMiddleware } = require('../middleware/auth');
 const { moderateContentMiddleware } = require('../services/contentModeration');
+const { sendNewPostNotification, sendNewReplyNotification } = require('../services/emailService');
 
 router.get('/posts', async (req, res) => {
   try {
@@ -73,7 +75,12 @@ router.post('/posts', authMiddleware, moderateContentMiddleware, [
 
     await post.save();
     await post.populate('author', 'username fullName avatar');
-    
+
+    // Send notification email to admin
+    sendNewPostNotification(post, post.author).catch(err => {
+      console.error('Failed to send new post notification:', err);
+    });
+
     // Update user's contribution stats
     const User = require('../models/User');
     await User.findByIdAndUpdate(req.user.userId, {
@@ -119,6 +126,15 @@ router.post('/posts/:id/reply', authMiddleware, moderateContentMiddleware, [
 
     await post.save();
     await post.populate('replies.author', 'username fullName avatar');
+
+    // Get the newly added reply and its author for notification
+    const newReply = post.replies[post.replies.length - 1];
+    const replyAuthor = await User.findById(req.user.userId).select('username fullName');
+
+    // Send notification email to admin
+    sendNewReplyNotification(post, newReply, replyAuthor).catch(err => {
+      console.error('Failed to send new reply notification:', err);
+    });
 
     res.status(201).json({
       message: 'Reply added successfully',

@@ -3,6 +3,7 @@ const router = express.Router();
 const User = require('../models/User');
 const ForumPost = require('../models/ForumPost');
 const Event = require('../models/Event');
+const Settings = require('../models/Settings');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { startOfDay, startOfWeek, startOfMonth, subDays } = require('date-fns');
 
@@ -312,15 +313,8 @@ router.delete('/posts/:postId', async (req, res) => {
 // Get system settings
 router.get('/settings', async (req, res) => {
   try {
-    // Return default settings for now
-    res.json({
-      siteName: 'Indians in Frankfurt Hub',
-      contactEmail: 'admin@indiansfrankfurt.com',
-      registration: 'open',
-      autoModerate: true,
-      emailVerification: true,
-      spamProtection: true
-    });
+    const settings = await Settings.getSettings();
+    res.json(settings);
   } catch (error) {
     console.error('Error fetching settings:', error);
     res.status(500).json({ error: 'Failed to fetch settings' });
@@ -330,8 +324,18 @@ router.get('/settings', async (req, res) => {
 // Update system settings
 router.patch('/settings', async (req, res) => {
   try {
-    // In a real app, save to database
-    res.json({ message: 'Settings updated successfully' });
+    const { siteName, contactEmail, registration, autoModerate, emailVerification, spamProtection } = req.body;
+
+    const updateData = {};
+    if (siteName !== undefined) updateData.siteName = siteName;
+    if (contactEmail !== undefined) updateData.contactEmail = contactEmail;
+    if (registration !== undefined) updateData.registration = registration;
+    if (autoModerate !== undefined) updateData.autoModerate = autoModerate;
+    if (emailVerification !== undefined) updateData.emailVerification = emailVerification;
+    if (spamProtection !== undefined) updateData.spamProtection = spamProtection;
+
+    const settings = await Settings.updateSettings(updateData);
+    res.json({ message: 'Settings updated successfully', settings });
   } catch (error) {
     console.error('Error updating settings:', error);
     res.status(500).json({ error: 'Failed to update settings' });

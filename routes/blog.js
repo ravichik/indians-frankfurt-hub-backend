@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const BlogPost = require('../models/BlogPost');
+const User = require('../models/User');
 const { authMiddleware: auth } = require('../middleware/auth');
+const { sendNewBlogPostNotification } = require('../services/emailService');
 
 // Get all published blog posts (public)
 router.get('/posts', async (req, res) => {
@@ -132,6 +134,11 @@ router.post('/posts', auth, async (req, res) => {
     await blogPost.save();
     await blogPost.populate('author', 'name avatar');
 
+    // Send notification email to admin
+    sendNewBlogPostNotification(blogPost, blogPost.author).catch(err => {
+      console.error('Failed to send new blog post notification:', err);
+    });
+
     res.status(201).json(blogPost);
   } catch (error) {
     console.error('Error creating blog post:', error);
@@ -163,6 +170,10 @@ router.put('/posts/:id', auth, async (req, res) => {
       }
     }
 
+    // Check if we're publishing a draft
+    const existingPost = await BlogPost.findById(req.params.id);
+    const wasPublishing = existingPost && existingPost.status !== 'published' && req.body.status === 'published';
+
     const post = await BlogPost.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -171,6 +182,13 @@ router.put('/posts/:id', auth, async (req, res) => {
 
     if (!post) {
       return res.status(404).json({ message: 'Post not found' });
+    }
+
+    // Send notification if blog post was just published
+    if (wasPublishing) {
+      sendNewBlogPostNotification(post, post.author).catch(err => {
+        console.error('Failed to send blog post publication notification:', err);
+      });
     }
 
     res.json(post);

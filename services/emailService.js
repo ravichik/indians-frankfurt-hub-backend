@@ -352,10 +352,87 @@ const sendNewEventNotification = async (event, author) => {
   }
 };
 
+// Send notification for new blog post
+const sendNewBlogPostNotification = async (blogPost, author) => {
+  try {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS || process.env.EMAIL_PASS === 'your-app-specific-password') {
+      console.log('WARNING: Email service not configured. Skipping new blog post notification.');
+      return true;
+    }
+
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: `Indians Frankfurt Hub <${process.env.EMAIL_USER}>`,
+      to: ADMIN_EMAIL,
+      subject: '📰 New Blog Post Published - Indians in Frankfurt Hub',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #FF9933 0%, #FFFFFF 50%, #138808 100%); padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .blog-box { background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #28a745; }
+            .content-preview { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 3px solid #6c757d; }
+            .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="color: white; margin: 0;">📰 New Blog Post Published</h1>
+            </div>
+            <div class="content">
+              <h2>New Blog Article Available</h2>
+              <div class="blog-box">
+                <h3 style="margin-top: 0;">${blogPost.title}</h3>
+                <p><strong>Author:</strong> ${author.name || author.fullName || author.username}</p>
+                <p><strong>Category:</strong> ${blogPost.category || 'General'}</p>
+                <p><strong>Status:</strong> ${blogPost.status}</p>
+                <p><strong>Published:</strong> ${new Date(blogPost.createdAt).toLocaleString()}</p>
+                ${blogPost.tags && blogPost.tags.length > 0 ? `<p><strong>Tags:</strong> ${blogPost.tags.join(', ')}</p>` : ''}
+                ${blogPost.slug ? `<p><strong>Slug:</strong> ${blogPost.slug}</p>` : ''}
+                ${blogPost.readTime ? `<p><strong>Read Time:</strong> ${blogPost.readTime} min</p>` : ''}
+              </div>
+              ${blogPost.excerpt ? `
+                <div class="content-preview">
+                  <strong>Excerpt:</strong><br>
+                  ${blogPost.excerpt}
+                </div>
+              ` : ''}
+              ${blogPost.content ? `
+                <div class="content-preview">
+                  <strong>Content Preview:</strong><br>
+                  ${blogPost.content.substring(0, 400)}${blogPost.content.length > 400 ? '...' : ''}
+                </div>
+              ` : ''}
+            </div>
+            <div class="footer">
+              <p>© 2025 Indians in Frankfurt Hub - Admin Notifications</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('New blog post notification sent successfully');
+    return true;
+  } catch (error) {
+    console.error('Error sending new blog post notification:', error);
+    return false;
+  }
+};
+
 module.exports = {
   sendPasswordResetEmail,
   sendNewUserNotification,
   sendNewPostNotification,
   sendNewReplyNotification,
-  sendNewEventNotification
+  sendNewEventNotification,
+  sendNewBlogPostNotification
 };
